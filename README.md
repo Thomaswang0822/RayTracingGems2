@@ -66,7 +66,7 @@ impact performance slightly.
 ChameleonRT only supports per-OBJ group/mesh materials, OBJ files using per-face materials
 can be reexported from Blender with the "Material Groups" option enabled.
 
-To build with PBRT file support set the CMake option `CHAMELEONRT_PBRT_SUPPORT=ON` and pass
+To build with PBRT file support set the CMake option `PBRT_SUPPORT=ON` and pass
 `-DpbrtParser_DIR=<path>` with `<path>` pointing to the CMake export files for
 your build of [Ingo Wald's pbrt-parser](https://github.com/ingowald/pbrt-parser).
 

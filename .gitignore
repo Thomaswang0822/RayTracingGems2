@@ -1,8 +1,13 @@
 *.swp
 *.raw
 build/
+out/
 cmake-build
 cmake-ninja
 .DS_Store
 compile_commands.json
 .cache/
+
+.vs
+scenes/
+/CMakeSettings.json

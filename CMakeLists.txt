@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(chameleonrt)
+project(gems)
 
 if (NOT WIN32)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
@@ -29,16 +29,16 @@ add_subdirectory(backends)
 
 option(REPORT_RAY_STATS "Track and report rays/second. May incur a slight rendering performance penalty" OFF)
 
-add_executable(chameleonrt main.cpp)
+add_executable(gems main.cpp)
 
-set_target_properties(chameleonrt PROPERTIES
+set_target_properties(gems PROPERTIES
 	CXX_STANDARD 14
 	CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(chameleonrt PUBLIC
+target_link_libraries(gems PUBLIC
     util
     display)
 
-install(TARGETS chameleonrt
+install(TARGETS gems
         RUNTIME DESTINATION bin)
 
