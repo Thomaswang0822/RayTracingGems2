@@ -25,7 +25,7 @@ DescriptorHeap::DescriptorHeap(D3D12_DESCRIPTOR_HEAP_DESC desc,
 
 D3D12_ROOT_PARAMETER DescriptorHeap::root_param() const
 {
-    D3D12_ROOT_PARAMETER param = {0};
+    D3D12_ROOT_PARAMETER param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     param.DescriptorTable.NumDescriptorRanges = ranges.size();
@@ -58,7 +58,7 @@ void DescriptorHeapBuilder::add_range(D3D12_DESCRIPTOR_RANGE_TYPE type,
                                       uint32_t base_register,
                                       uint32_t space)
 {
-    D3D12_DESCRIPTOR_RANGE r = {0};
+    D3D12_DESCRIPTOR_RANGE r = {};
     r.RangeType = type;
     r.NumDescriptors = size;
     r.BaseShaderRegister = base_register;
@@ -124,7 +124,7 @@ DescriptorHeap DescriptorHeapBuilder::create(ID3D12Device *device)
     }
 
     ComPtr<ID3D12DescriptorHeap> heap;
-    D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {0};
+    D3D12_DESCRIPTOR_HEAP_DESC heap_desc = {};
     heap_desc.NumDescriptors = num_descriptors();
     heap_desc.Type = contains_cbv_srv_uav ? D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
                                           : D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
@@ -212,7 +212,7 @@ void RootSignatureBuilder::add_descriptor(D3D12_ROOT_PARAMETER_TYPE desc_type,
                                           uint32_t shader_register,
                                           uint32_t space)
 {
-    D3D12_ROOT_PARAMETER p = {0};
+    D3D12_ROOT_PARAMETER p = {};
     p.ParameterType = desc_type;
     p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     p.Descriptor.ShaderRegister = shader_register;
@@ -225,7 +225,7 @@ RootSignatureBuilder &RootSignatureBuilder::add_constants(const std::string &nam
                                                           uint32_t num_vals,
                                                           uint32_t space)
 {
-    D3D12_ROOT_PARAMETER p = {0};
+    D3D12_ROOT_PARAMETER p = {};
     p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
     p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     p.Constants.ShaderRegister = shader_register;
@@ -494,7 +494,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
 
     // Add the shader libraries
     for (const auto &lib : shader_libs) {
-        D3D12_STATE_SUBOBJECT l = {0};
+        D3D12_STATE_SUBOBJECT l = {};
         l.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
         l.pDesc = lib.library();
         subobjects[current_obj++] = l;
@@ -519,7 +519,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
                 hg.has_intersection() ? hg.intersection.c_str() : nullptr;
             desc.AnyHitShaderImport = hg.has_any_hit() ? hg.any_hit.c_str() : nullptr;
 
-            D3D12_STATE_SUBOBJECT o = {0};
+            D3D12_STATE_SUBOBJECT o = {};
             o.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
             o.pDesc = &desc;
             subobjects[current_obj++] = o;
@@ -529,7 +529,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
     // Make the shader payload configs and associate them with the desired functions
     for (const auto &c : payload_configs) {
         // Add the shader config object
-        D3D12_STATE_SUBOBJECT o = {0};
+        D3D12_STATE_SUBOBJECT o = {};
         o.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
         o.pDesc = &c.desc;
         subobjects[current_obj++] = o;
@@ -545,7 +545,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
             associated_fcns[current_assoc_fcn++] = name.c_str();
         }
 
-        D3D12_STATE_SUBOBJECT payload_subobj = {0};
+        D3D12_STATE_SUBOBJECT payload_subobj = {};
         payload_subobj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
         payload_subobj.pDesc = &assoc;
         subobjects[current_obj++] = payload_subobj;
@@ -561,7 +561,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
             D3D12_LOCAL_ROOT_SIGNATURE &local_sig = local_root_sigs[current_sig++];
             local_sig.pLocalRootSignature = sig.signature.get();
 
-            D3D12_STATE_SUBOBJECT root_sig_obj = {0};
+            D3D12_STATE_SUBOBJECT root_sig_obj = {};
             root_sig_obj.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
             root_sig_obj.pDesc = &local_sig;
             subobjects[current_obj++] = root_sig_obj;
@@ -577,7 +577,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
                 associated_fcns[current_assoc_fcn++] = name.c_str();
             }
 
-            D3D12_STATE_SUBOBJECT payload_subobj = {0};
+            D3D12_STATE_SUBOBJECT payload_subobj = {};
             payload_subobj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
             payload_subobj.pDesc = &assoc;
             subobjects[current_obj++] = payload_subobj;
@@ -588,7 +588,7 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
     D3D12_RAYTRACING_PIPELINE_CONFIG pipeline_cfg = {0};
     pipeline_cfg.MaxTraceRecursionDepth = recursion_depth;
     {
-        D3D12_STATE_SUBOBJECT o = {0};
+        D3D12_STATE_SUBOBJECT o = {};
         o.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
         o.pDesc = &pipeline_cfg;
         // 8: Pipeline config
@@ -599,13 +599,13 @@ RTPipeline RTPipelineBuilder::create(ID3D12Device5 *device)
     D3D12_GLOBAL_ROOT_SIGNATURE global_root_sig_obj = {0};
     if (has_global_root_sig()) {
         global_root_sig_obj.pGlobalRootSignature = global_sig.get();
-        D3D12_STATE_SUBOBJECT o = {0};
+        D3D12_STATE_SUBOBJECT o = {};
         o.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
         o.pDesc = &global_root_sig_obj;
         subobjects[current_obj++] = o;
     }
 
-    D3D12_STATE_OBJECT_DESC pipeline_desc = {0};
+    D3D12_STATE_OBJECT_DESC pipeline_desc = {};
     pipeline_desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
     pipeline_desc.NumSubobjects = current_obj;
     pipeline_desc.pSubobjects = subobjects.data();
@@ -889,7 +889,7 @@ void BottomLevelBVH::enqeue_build(ID3D12Device5 *device, ID3D12GraphicsCommandLi
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
 
     // Determine bound of much memory the accel builder may need and allocate it
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bvh_inputs = {0};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bvh_inputs = {};
     bvh_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     bvh_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     bvh_inputs.NumDescs = geom_descs.size();
@@ -997,7 +997,7 @@ TopLevelBVH::TopLevelBVH(Buffer instance_buf,
 void TopLevelBVH::enqeue_build(ID3D12Device5 *device, ID3D12GraphicsCommandList4 *cmd_list)
 {
     // Determine bound of much memory the accel builder may need and allocate it
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bvh_inputs = {0};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bvh_inputs = {};
     bvh_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     bvh_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     bvh_inputs.NumDescs = instances.size();

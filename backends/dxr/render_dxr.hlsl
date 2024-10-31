@@ -23,6 +23,21 @@ struct MaterialParams {
     float2 pad;
 };
 
+///// See util/Camera/camera.h
+//struct CameraParams
+//{
+//    float cameraFOVAngle;
+//    int cameraFOVDirection;
+//    float2 imageSize;
+//    float paniniDistance;
+//    float paniniVerticalCompression;
+//    float cameraFovDistance;
+//    float lensFocalLength;
+//    float fStop;
+//    float imagePlaneDistance;
+//    float2 padding;
+//};
+
 // Raytracing output texture, accessed as a UAV
 RWTexture2D<float4> output : register(u0);
 
@@ -36,6 +51,7 @@ RWTexture2D<uint> ray_stats : register(u2);
 // View params buffer
 cbuffer ViewParams : register(b0) {
     float4 cam_pos;
+    // camera's right and up directions scaled by the image plane size.
     float4 cam_du;
     float4 cam_dv;
     float4 cam_dir_top_left;
@@ -43,7 +59,22 @@ cbuffer ViewParams : register(b0) {
     uint32_t samples_per_pixel;
 }
 
-cbuffer SceneParams : register(b1) {
+/// See util/Camera/camera.h
+cbuffer CameraParams : register(b1)
+{
+    float cameraFOVAngle;
+    int cameraFOVDirection;
+    float2 imageSize;
+    float paniniDistance;
+    float paniniVerticalCompression;
+    float cameraFovDistance;
+    float lensFocalLength;
+    float fStop;
+    float imagePlaneDistance;
+    float2 padding;
+}
+
+cbuffer SceneParams : register(b2) {
     uint32_t num_lights;
 };
 
@@ -183,6 +214,9 @@ void RayGen() {
         ray.Direction = normalize(d.x * cam_du.xyz + d.y * cam_dv.xyz + cam_dir_top_left.xyz);
         ray.TMin = 0;
         ray.TMax = 1e20f;
+        
+        /// DEBUG: try to access CameraParams
+        float aspect_ratio = imageSize.x / imageSize.y;
 
         DisneyMaterial mat;
         int bounce = 0;

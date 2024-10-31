@@ -122,7 +122,7 @@ void run_app(const std::vector<std::string> &args,
     glm::vec3 eye(0, 0, 5);
     glm::vec3 center(0);
     glm::vec3 up(0, 1, 0);
-    float fov_y = 65.f;
+    float fov_y = 90.f;
     uint32_t samples_per_pixel = 1;
     size_t camera_id = 0;
     size_t benchmark_frames = 0;
@@ -205,7 +205,7 @@ void run_app(const std::vector<std::string> &args,
 
         renderer->set_scene(scene);
 
-        if (!got_camera_args && !scene.cameras.empty()) {
+        if (!got_camera_args && !scene.cameras.empty() && camera_id <= scene.cameras.size()) {
             eye = scene.cameras[camera_id].position;
             center = scene.cameras[camera_id].center;
             up = scene.cameras[camera_id].up;
