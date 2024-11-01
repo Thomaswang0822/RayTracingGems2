@@ -8,6 +8,15 @@ struct Camera {
     float fov_y;  // in degree, default to 90
 };
 
+enum CameraType : uint32_t 
+{
+    Pinhole,
+    ThinLens,
+    Panini,
+    FishEye,
+    Orthographic
+};
+
 /// Implement RTG2 chapter 3, with some default value
 struct CameraParams {
     // Edge-to-edge field of view , in radians
@@ -43,6 +52,8 @@ struct CameraParams {
     // The camera is modeled at the center of the lens.
     float imagePlaneDistance = lensFocalLength;
 
+    CameraType type = CameraType::FishEye;
+
     // to ensure multiple of 4 bytes
-    glm::vec2 padding = {0.f, 0.f};
+    float padding = 0.f;
 };

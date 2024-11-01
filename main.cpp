@@ -198,6 +198,7 @@ void run_app(const std::vector<std::string> &args,
            << "# Textures: " << scene.textures.size() << "\n"
            << "# Lights: " << scene.lights.size() << "\n"
            << "# Cameras: " << scene.cameras.size() << "\n"
+           << "# Camera Type: " << scene.camParams.type << "\n"
            << "# Samples per Pixel: " << scene.samples_per_pixel;
 
         scene_info = ss.str();

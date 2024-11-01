@@ -576,7 +576,7 @@ void RenderDXR::create_device_objects()
     // uint32_t samples_per_pixel
     view_param_buf = dxr::Buffer::upload(
         device.Get(),
-        align_to(5 * sizeof(glm::vec4), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT),
+        align_to(6 * sizeof(glm::vec4), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT),
         D3D12_RESOURCE_STATE_GENERIC_READ);
 
     // Another buffer for camera parameters
@@ -784,10 +784,11 @@ void RenderDXR::update_view_parameters(const glm::vec3 &pos,
         vecs[0] = glm::vec4(pos, 0.f);
         vecs[1] = glm::vec4(dir_du, 0.f);
         vecs[2] = glm::vec4(dir_dv, 0.f);
-        vecs[3] = glm::vec4(dir_top_left, 0.f);
+        vecs[3] = glm::vec4(dir, 0.f);
+        vecs[4] = glm::vec4(dir_top_left, 0.f);
     }
     {
-        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 4 * sizeof(glm::vec4));
+        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 5 * sizeof(glm::vec4));
         fid[0] = frame_id;
         fid[1] = samples_per_pixel;
     }
