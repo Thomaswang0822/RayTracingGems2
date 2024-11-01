@@ -45,6 +45,32 @@ glm::vec2 transform_mouse(glm::vec2 in)
     return glm::vec2(in.x * 2.f / win_width - 1.f, 1.f - 2.f * in.y / win_height);
 }
 
+void DisplayVec3(const char *label, const glm::vec3 vec)
+{
+    ImGui::Text("%s: (%.3f, %.3f, %.3f)", label, vec.x, vec.y, vec.z);
+}
+
+// Helper function to display an ImGui dropdown for CameraType
+bool DisplayCameraTypeDropdown(CameraType &type)
+{
+    // Array of camera type names to display in the dropdown
+    const char *cameraTypeNames[] = {
+        "Pinhole", "ThinLens", "Panini", "FishEye", "Orthographic"};
+
+    // Cast the current CameraType to an int pointer for ImGui
+    int currentType = static_cast<int>(type);
+
+    // ImGui Combo box for selecting the camera type
+    if (ImGui::Combo(
+            "Camera Type", &currentType, cameraTypeNames, IM_ARRAYSIZE(cameraTypeNames))) {
+        // Cast back to CameraType when the user makes a selection
+        type = static_cast<CameraType>(currentType);
+        return true;
+    }
+
+    return false;
+}
+
 int main(int argc, const char **argv)
 {
     const std::vector<std::string> args(argv, argv + argc);
@@ -119,8 +145,8 @@ void run_app(const std::vector<std::string> &args,
 
     std::string scene_file;
     bool got_camera_args = false;
-    glm::vec3 eye(0, 0, 5);
-    glm::vec3 center(0);
+    glm::vec3 eye(0, 3, 5);
+    glm::vec3 center(0, 3, -1);
     glm::vec3 up(0, 1, 0);
     float fov_y = 90.f;
     uint32_t samples_per_pixel = 1;
@@ -182,7 +208,7 @@ void run_app(const std::vector<std::string> &args,
     renderer->initialize(win_width, win_height);
 
     std::string scene_info;
-    {
+    //{
         Scene scene(scene_file, material_mode);
         scene.samples_per_pixel = samples_per_pixel;
 
@@ -212,14 +238,14 @@ void run_app(const std::vector<std::string> &args,
             up = scene.cameras[camera_id].up;
             fov_y = scene.cameras[camera_id].fov_y;
         }
-    }
+    //}
 
     ArcballCamera camera(eye, center, up);
 
     const std::string rt_backend = renderer->name();
     const std::string cpu_brand = get_cpu_brand();
     const std::string gpu_brand = display->gpu_brand();
-    const std::string image_output = "chameleonrt.png";
+    const std::string image_output = "screenshot.png";
     const std::string display_frontend = display->name();
 
     size_t frame_id = 0;
@@ -374,6 +400,12 @@ void run_app(const std::vector<std::string> &args,
             save_image = true;
         }
 
+        if (DisplayCameraTypeDropdown(scene.camParams.type))
+        {
+            renderer->set_scene(scene);
+            camera_changed = true;
+        }
+            
         ImGui::End();
         ImGui::Render();
 

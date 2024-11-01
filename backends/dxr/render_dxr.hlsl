@@ -171,17 +171,28 @@ float3 sample_direct_light(in const DisneyMaterial mat, in const float3 hit_p, i
 
 RayDesc genCameraRay(const in uint2 pixel, const in float2 dims, inout LCGRand rng)
 {
-    const float2 d = (pixel + float2(lcg_randomf(rng), lcg_randomf(rng))) / dims;
     float3 origin, dir;
     
-    switch (camParams.camType)
+    switch (camParams.camType)  // see util/Camera/camera.h
     {
         case 0u:
             computePinholeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
             break;
         
-        case 2u:  // Panini
+        case 1u:
+            computeThinLensRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 2u:
             computePaniniRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 3u:
+            computeFishEyeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 4u:
+            computeOrthographicRay(pixel, dims, rng, viewParams, camParams, origin, dir);
             break;
         
         default:
@@ -190,6 +201,9 @@ RayDesc genCameraRay(const in uint2 pixel, const in float2 dims, inout LCGRand r
     }
     
     RayDesc ray = { origin, 0.f, dir, 1e20f };
+    
+    // hack: sometimes (like in FishEye), we generate invalid rays
+    //ray.TMax = length(dir) > 0.9f ? 1e20f : -1.f;
     
     return ray;
 

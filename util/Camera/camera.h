@@ -52,7 +52,7 @@ struct CameraParams {
     // The camera is modeled at the center of the lens.
     float imagePlaneDistance = lensFocalLength;
 
-    CameraType type = CameraType::FishEye;
+    CameraType type = CameraType::Orthographic;
 
     // to ensure multiple of 4 bytes
     float padding = 0.f;
