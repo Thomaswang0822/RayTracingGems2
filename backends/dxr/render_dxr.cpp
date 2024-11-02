@@ -416,6 +416,11 @@ void RenderDXR::set_scene(const Scene &scene)
     update_camera_parameters(scene.camParams);
 }
 
+void RenderDXR::update_scene(const Scene &scene) 
+{
+    update_camera_parameters(scene.camParams);
+}
+
 RenderStats RenderDXR::render(const glm::vec3 &pos,
                               const glm::vec3 &dir,
                               const glm::vec3 &up,

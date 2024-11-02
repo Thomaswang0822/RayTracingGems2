@@ -668,6 +668,11 @@ void RenderVulkan::set_scene(const Scene &scene)
     record_command_buffers();
 }
 
+void RenderVulkan::update_scene(const Scene &scene) 
+{
+    // TODO
+}
+
 RenderStats RenderVulkan::render(const glm::vec3 &pos,
                                  const glm::vec3 &dir,
                                  const glm::vec3 &up,

@@ -77,6 +77,8 @@ struct RenderVulkan : RenderBackend {
 
     void set_scene(const Scene &scene) override;
 
+    void update_scene(const Scene &scene) override;
+
     RenderStats render(const glm::vec3 &pos,
                        const glm::vec3 &dir,
                        const glm::vec3 &up,

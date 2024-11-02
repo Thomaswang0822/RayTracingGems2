@@ -402,7 +402,7 @@ void run_app(const std::vector<std::string> &args,
 
         if (DisplayCameraTypeDropdown(scene.camParams.type))
         {
-            renderer->set_scene(scene);
+            renderer->update_scene(scene);
             camera_changed = true;
         }
             
