@@ -56,6 +56,7 @@ float pow2(float x) {
 	return x * x;
 }
 
+// draw sample on a unit disk uniformly
 float2 concentric_sample_disk(float u1, float u2)
 {
     float r, theta;

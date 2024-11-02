@@ -49,10 +49,10 @@ struct CameraParams {
     float fStop = 8.0f;
 
     // Distance from the image plane to the lens
-    // The camera is modeled at the center of the lens.
-    float imagePlaneDistance = lensFocalLength;
+    // want focus distance ~= 5.f
+    float imagePlaneDistance = 0.0505f;
 
-    CameraType type = CameraType::Orthographic;
+    CameraType type = CameraType::ThinLens;
 
     // to ensure multiple of 4 bytes
     float padding = 0.f;

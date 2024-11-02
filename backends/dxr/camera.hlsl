@@ -10,7 +10,7 @@ struct ViewParams
     // camera's right and up directions scaled by the image plane size.
     float4 cam_du;
     float4 cam_dv;
-    float4 cam_dir_forward;  // center of image plane
+    float4 cam_dir_forward;  // -z dir, default (0,0,-1)
     float4 cam_dir_top_left; // top-left corner
     
     uint32_t frame_id;
@@ -36,13 +36,23 @@ struct CameraParams
 };
 
 
+///
+/// About spaces
+/// There are 3 spaces involved in this file: camera, world, image/pixel
+/// - world space: x - right, y - up, z - forward;
+/// - camera space: x - right, y - up, z - backward (toward viewer)
+/// - pixel space (2D): x - right, y - down.
+
+
 /// Utility function, convert a direction from camera space to world space
+/// For input camera-space dir, we want to flip its z direction, which means the camera-space
+/// ray is pointing from camera to scene (-z), instead of viewer/eye (+z).
 float3 dirCamToWorld(const in ViewParams viewParams, const in float3 direction)
 {
     float3 dir_world = normalize(
-        direction.x * viewParams.cam_du.xyz +
-        direction.y * viewParams.cam_dv.xyz +
-        direction.z * viewParams.cam_dir_forward.xyz
+        direction.x * viewParams.cam_du.xyz
+        - direction.y * viewParams.cam_dv.xyz  // cam_dv is down instead of up
+        + direction.z * viewParams.cam_dir_forward.xyz
     );
     
     return dir_world;
@@ -61,10 +71,9 @@ void computePinholeRay(
 {    
     float tanHalfAngle = tan(camParams.cameraFOVAngle / 2.f);
     float aspectScale = ((camParams.cameraFOVDirection == 0) ? camParams.imageSize.x : camParams.imageSize.y) / 2.f;
-  
     float2 pixel_cord = pixel + float2(lcg_randomf(rng), lcg_randomf(rng)) - camParams.imageSize / 2.f;
-  
-    float3 direction = normalize(float3(float2(pixel_cord.x, pixel_cord.y) * tanHalfAngle / aspectScale, -1.f));
+    // y is flipped for image <-> camera space
+    float3 direction = normalize(float3(float2(pixel_cord.x, -pixel_cord.y) * tanHalfAngle / aspectScale, -1.f));
     
     // write
     origin = viewParams.cam_pos.xyz;
@@ -78,38 +87,29 @@ void computeThinLensRay(
     out float3 origin, out float3 dir
 )
 {
-    // Step 1: Generate the pinhole ray
-    float3 pinhole_origin, pinhole_dir;
-    computePinholeRay(pixel, dims, rng, viewParams, camParams, pinhole_origin, pinhole_dir);
-    
-    // Step 2: Sample a point on the lens aperture (disk) with concentric disk sampling
-    float rand1 = lcg_randomf(rng);
-    float rand2 = lcg_randomf(rng);
-    float2 lensOffset = concentric_sample_disk(rand1, rand2);
-    
-    // Scale lens sample by lens radius
-    float theta = lensOffset.x * 2.f * M_PI;
-    float radius = lensOffset.y;
-    
-    float u = cos(theta) * sqrt(radius);
-    float v = sin(theta) * sqrt(radius);
-    
-    // Step 4: Compute the focus plane distance
+    // Step 1: pinhole ray dir in camera space
+    //Ray pinholeRay = pinholeRay(pixel);
+    float3 pinholeDir;
+    {
+        float tanHalfAngle = tan(camParams.cameraFOVAngle / 2.f);
+        float aspectScale = ((camParams.cameraFOVDirection == 0) ? camParams.imageSize.x : camParams.imageSize.y) / 2.f;
+        float2 pixel_cord = pixel + float2(lcg_randomf(rng), lcg_randomf(rng)) - camParams.imageSize / 2.f;
+        pinholeDir = normalize(float3(float2(pixel_cord.x, -pixel_cord.y) * tanHalfAngle / aspectScale, -1.f));
+    }
+
+    // Step 2: compute focal point
     float focusPlane = (camParams.imagePlaneDistance * camParams.lensFocalLength) /
                        (camParams.imagePlaneDistance - camParams.lensFocalLength);
+    float3 focusPoint = pinholeDir * (focusPlane / dot(pinholeDir, float3(0.f, 0.f, -1.f)));
     
-    float3 focusPoint = pinhole_dir * (focusPlane / dot(pinhole_dir, float3(0.f, 0.f, -1.f)));
+    // Step 3: draw sample on a disk and compute lens offset
+    float circleOfConfusionRadius = camParams.lensFocalLength / (2.0f * camParams.fStop);
+    float2 lens_sample = concentric_sample_disk(lcg_randomf(rng), lcg_randomf(rng)) * circleOfConfusionRadius; // camera space
+    float3 lens_offset = lens_sample.x * viewParams.cam_du.xyz + lens_sample.y * viewParams.cam_dv.xyz;  // world space
     
-    float circleOfConfusionRadius = camParams.lensFocalLength / (2.f * camParams.fStop);
-    
-    float3 camOrigin = float3(1.f, 0.f, 0.f) * (u * circleOfConfusionRadius) +
-                       float3(0.f, 1.f, 0.f) * (v * circleOfConfusionRadius);
-    
-    float3 direction = normalize(focusPoint - origin);
-    
-    // Step 6: Compute the new ray direction from the lens point to the focus point
-    origin = viewParams.cam_pos.xyz + camOrigin;
-    dir = dirCamToWorld(viewParams, direction);
+    // Step 4: compute origin and then direction
+    origin = viewParams.cam_pos.xyz + lens_offset;
+    dir = normalize(focusPoint - origin);
 }
 
 
@@ -138,7 +138,7 @@ void computePaniniRay(
     float y = lerp(hvPan.y / S, hvPan.y * z, camParams.paniniVerticalCompression);
 
     // camera space
-    float3 direction = normalize(float3(x, y, -z));
+    float3 direction = normalize(float3(x, -y, -z));
     
     // write
     origin = viewParams.cam_pos.xyz;
@@ -176,7 +176,7 @@ void computeFishEyeRay(
         dir = 0.f;
     }
     
-    float3 direction = normalize(float3(sin(angle.x), sin(angle.y) * cos(angle.x), -cos(angle.x) * cos(angle.y)));
+    float3 direction = normalize(float3(sin(angle.x), -sin(angle.y) * cos(angle.x), -cos(angle.x) * cos(angle.y)));
     // write
     origin = viewParams.cam_pos.xyz;
     dir = dirCamToWorld(viewParams, direction);
