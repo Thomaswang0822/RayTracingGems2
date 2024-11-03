@@ -7,6 +7,7 @@
 #include <vector>
 #include <SDL.h>
 #include "arcball_camera.h"
+#include "first_person_camera.h"
 #include "imgui.h"
 #include "scene.h"
 #include "stb_image_write.h"
@@ -15,13 +16,14 @@
 #include "util/display/gldisplay.h"
 #include "util/display/imgui_impl_sdl.h"
 #include "util/render_plugin.h"
+#include "main_util.h"
 
 const std::string USAGE =
     "Usage: <backend> <mesh.obj/gltf/glb> [options]\n"
     "Render backend libraries should be named following (lib)crt_<backend>.(dll|so)\n"
     "Options:\n"
     "\t-eye <x> <y> <z>       Set the camera position\n"
-    "\t-center <x> <y> <z>    Set the camera focus point\n"
+    "\t-camView <x> <y> <z>    Set the camera focus point\n"
     "\t-up <x> <y> <z>        Set the camera up vector\n"
     "\t-fov <fovy>            Specify the camera field of view (in degrees)\n"
     "\t-spp <n>               Specify the number of samples to take per-pixel. Defaults to 1\n"
@@ -32,18 +34,18 @@ const std::string USAGE =
     "white_diffuse\n"
     "\n";
 
-int win_width = 1280;
-int win_height = 720;
+//int win_width = 1280;
+//int win_height = 720;
 
 void run_app(const std::vector<std::string> &args,
              SDL_Window *window,
              Display *display,
              RenderPlugin *render_plugin);
 
-glm::vec2 transform_mouse(glm::vec2 in)
-{
-    return glm::vec2(in.x * 2.f / win_width - 1.f, 1.f - 2.f * in.y / win_height);
-}
+//glm::vec2 transform_mouse(glm::vec2 in)
+//{
+//    return glm::vec2(in.x * 2.f / win_width - 1.f, 1.f - 2.f * in.y / win_height);
+//}
 
 void DisplayVec3(const char *label, const glm::vec3 vec)
 {
@@ -146,7 +148,7 @@ void run_app(const std::vector<std::string> &args,
     std::string scene_file;
     bool got_camera_args = false;
     glm::vec3 eye(0, 3, 5);
-    glm::vec3 center(0, 3, -1);
+    glm::vec3 camView(0, 0, -1);
     glm::vec3 up(0, 1, 0);
     float fov_y = 90.f;
     uint32_t samples_per_pixel = 1;
@@ -160,10 +162,10 @@ void run_app(const std::vector<std::string> &args,
             eye.y = std::stof(args[++i]);
             eye.z = std::stof(args[++i]);
             got_camera_args = true;
-        } else if (args[i] == "-center") {
-            center.x = std::stof(args[++i]);
-            center.y = std::stof(args[++i]);
-            center.z = std::stof(args[++i]);
+        } else if (args[i] == "-camView") {
+            camView.x = std::stof(args[++i]);
+            camView.y = std::stof(args[++i]);
+            camView.z = std::stof(args[++i]);
             got_camera_args = true;
         } else if (args[i] == "-up") {
             up.x = std::stof(args[++i]);
@@ -234,13 +236,14 @@ void run_app(const std::vector<std::string> &args,
 
         if (!got_camera_args && !scene.cameras.empty() && camera_id <= scene.cameras.size()) {
             eye = scene.cameras[camera_id].position;
-            center = scene.cameras[camera_id].center;
+            camView = glm::normalize(scene.cameras[camera_id].center -
+                                     scene.cameras[camera_id].position);
             up = scene.cameras[camera_id].up;
             fov_y = scene.cameras[camera_id].fov_y;
         }
     //}
 
-    ArcballCamera camera(eye, center, up);
+    FirstPersonCamera camera(eye, camView, up);
 
     const std::string rt_backend = renderer->name();
     const std::string cpu_brand = get_cpu_brand();
@@ -257,61 +260,75 @@ void run_app(const std::vector<std::string> &args,
     bool save_image = false;
     while (!done) {
         SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                done = true;
-            }
-            if (!io.WantCaptureKeyboard && event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    done = true;
-                } else if (event.key.keysym.sym == SDLK_p) {
-                    auto eye = camera.eye();
-                    auto center = camera.center();
-                    auto up = camera.up();
-                    std::cout << "-eye " << eye.x << " " << eye.y << " " << eye.z
-                              << " -center " << center.x << " " << center.y << " " << center.z
-                              << " -up " << up.x << " " << up.y << " " << up.z << " -fov "
-                              << fov_y << "\n";
-                } else if (event.key.keysym.sym == SDLK_s) {
-                    save_image = true;
-                }
-            }
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
-                event.window.windowID == SDL_GetWindowID(window)) {
-                done = true;
-            }
-            if (!io.WantCaptureMouse) {
-                if (event.type == SDL_MOUSEMOTION) {
-                    const glm::vec2 cur_mouse =
-                        transform_mouse(glm::vec2(event.motion.x, event.motion.y));
-                    if (prev_mouse != glm::vec2(-2.f)) {
-                        if (event.motion.state & SDL_BUTTON_LMASK) {
-                            camera.rotate(prev_mouse, cur_mouse);
-                            camera_changed = true;
-                        } else if (event.motion.state & SDL_BUTTON_RMASK) {
-                            camera.pan(cur_mouse - prev_mouse);
-                            camera_changed = true;
-                        }
-                    }
-                    prev_mouse = cur_mouse;
-                } else if (event.type == SDL_MOUSEWHEEL) {
-                    camera.zoom(event.wheel.y * 0.1);
-                    camera_changed = true;
-                }
-            }
-            if (event.type == SDL_WINDOWEVENT &&
-                event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                frame_id = 0;
-                win_width = event.window.data1;
-                win_height = event.window.data2;
-                io.DisplaySize.x = win_width;
-                io.DisplaySize.y = win_height;
+        //while (SDL_PollEvent(&event)) {
+        //    ImGui_ImplSDL2_ProcessEvent(&event);
+        //    if (event.type == SDL_QUIT) {
+        //        done = true;
+        //    }
+        //    if (!io.WantCaptureKeyboard && event.type == SDL_KEYDOWN) {
+        //        if (event.key.keysym.sym == SDLK_ESCAPE) {
+        //            done = true;
+        //        } else if (event.key.keysym.sym == SDLK_p) {
+        //            auto eye = camera.get_position();
+        //            auto camView = camera.get_direction();
+        //            auto up = camera.get_up();
+        //            std::cout << "-eye " << eye.x << " " << eye.y << " " << eye.z
+        //                      << " -camView " << camView.x << " " << camView.y << " " << camView.z
+        //                      << " -up " << up.x << " " << up.y << " " << up.z << " -fov "
+        //                      << fov_y << "\n";
+        //        }
+        //        // WASD controls for camera movement
+        //        else if (event.key.keysym.sym == SDLK_w) {
+        //            camera.move(glm::vec3(0, 0, 1));  // Move forward
+        //        } else if (event.key.keysym.sym == SDLK_s) {
+        //            camera.move(glm::vec3(0, 0, -1));  // Move backward
+        //        } else if (event.key.keysym.sym == SDLK_a) {
+        //            camera.move(glm::vec3(-1, 0, 0));  // Move left
+        //        } else if (event.key.keysym.sym == SDLK_d) {
+        //            camera.move(glm::vec3(1, 0, 0));  // Move right
+        //        } else if (event.key.keysym.sym == SDLK_q) {
+        //            camera.move(glm::vec3(0, 1, 0));  // Move up
+        //        } else if (event.key.keysym.sym == SDLK_e) {
+        //            camera.move(glm::vec3(0, -1, 0));  // Move down
+        //        }
+        //    }
+        //    if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
+        //        event.window.windowID == SDL_GetWindowID(window)) {
+        //        done = true;
+        //    }
+        //    if (!io.WantCaptureMouse) {
+        //        if (event.type == SDL_MOUSEMOTION) {
+        //            const glm::vec2 cur_mouse =
+        //                transform_mouse(glm::vec2(event.motion.x, event.motion.y));
+        //            if (prev_mouse != glm::vec2(-2.f)) {
+        //                if (event.motion.state & SDL_BUTTON_LMASK) {
+        //                    camera.rotate(prev_mouse, cur_mouse);
+        //                    camera_changed = true;
+        //                } else if (event.motion.state & SDL_BUTTON_RMASK) {
+        //                    //camera.pan(cur_mouse - prev_mouse);
+        //                    //camera_changed = true;
+        //                }
+        //            }
+        //            prev_mouse = cur_mouse;
+        //        } else if (event.type == SDL_MOUSEWHEEL) {
+        //            //camera.zoom(event.wheel.y * 0.1);
+        //            //camera_changed = true;
+        //        }
+        //    }
+        //    if (event.type == SDL_WINDOWEVENT &&
+        //        event.window.event == SDL_WINDOWEVENT_RESIZED) {
+        //        frame_id = 0;
+        //        win_width = event.window.data1;
+        //        win_height = event.window.data2;
+        //        io.DisplaySize.x = win_width;
+        //        io.DisplaySize.y = win_height;
 
-                display->resize(win_width, win_height);
-                renderer->initialize(win_width, win_height);
-            }
-        }
+        //        display->resize(win_width, win_height);
+        //        renderer->initialize(win_width, win_height);
+        //    }
+        //}
+        done = process_SDL_Event(
+            event, io, camera, window, renderer, display, camera_changed, prev_mouse, fov_y);
 
         if (camera_changed) {
             frame_id = 0;
@@ -325,7 +342,7 @@ void run_app(const std::vector<std::string> &args,
 
         const bool need_readback = save_image || !validation_img_prefix.empty();
         RenderStats stats = renderer->render(
-            camera.eye(), camera.dir(), camera.up(), fov_y, camera_changed, need_readback);
+            camera.get_position(), camera.get_direction(), camera.get_up(), fov_y, camera_changed, need_readback);
 
         ++frame_id;
         camera_changed = false;

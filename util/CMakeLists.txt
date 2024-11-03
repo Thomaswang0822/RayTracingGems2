@@ -2,6 +2,7 @@ add_subdirectory(display)
 
 add_library(util
     "Camera/arcball_camera.cpp"
+    "Camera/first_person_camera.cpp"
     util.cpp
     material.cpp
     mesh.cpp
@@ -10,7 +11,7 @@ add_library(util
     gltf_types.cpp
     flatten_gltf.cpp
     file_mapping.cpp
-    render_plugin.cpp)
+    render_plugin.cpp "main_util.h" "main_util.cpp")
 
 set_target_properties(util PROPERTIES
     CXX_STANDARD 14
