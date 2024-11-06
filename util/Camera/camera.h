@@ -2,6 +2,9 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
+#include <SDL_stdinc.h>
+
+static const float fovDefaultDeg = 90.f;
 
 struct Camera {
     glm::vec3 position, center, up;
@@ -20,7 +23,7 @@ enum CameraType : uint32_t
 /// Implement RTG2 chapter 3, with some default value
 struct CameraParams {
     // Edge-to-edge field of view , in radians
-    float cameraFOVAngle = glm::half_pi<float>() * 1.333f;
+    float cameraFOVAngle = fovDefaultDeg * M_PI / 180.f;
 
     // 0 = cameraFOV is the horizontal FOV
     // 1 = vertical
@@ -28,7 +31,7 @@ struct CameraParams {
     int cameraFOVDirection = 0;
 
     // Integers stored as floats to avoid conversion, = render_target.dims()
-    glm::vec2 imageSize = {1280.f, 720.f};
+    glm::vec2 imageSize = {1920.f, 1080.f};
 
     // Center of projection from cylinder to plane ,
     // can be any positive number
@@ -39,18 +42,18 @@ struct CameraParams {
     float paniniVerticalCompression = 1.f;
 
     // Scalar field of view in m, used for orthographic projection
-    float cameraFovDistance = 5.0f;
+    float cameraFovDistance = 6.0f;
 
     // Lens focal length in meters ,
     // would be measured in millimeters for a physical camera
-    float lensFocalLength = 0.050f;
+    float lensFocalLength = 0.030f;
 
     // Ratio of focal length to aperture diameter
-    float fStop = 8.0f;
+    float fStop = lensFocalLength / 0.035f;
 
     // Distance from the image plane to the lens
     // want focus distance ~= 5.f
-    float imagePlaneDistance = 0.0505f;
+    float imagePlaneDistance = 0.0302f;
 
     CameraType type = CameraType::Pinhole;
 

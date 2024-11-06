@@ -200,8 +200,8 @@ void computeOrthographicRay(
     float2 ndc = d - 0.5f;
 
     // Compute the size of the image plane in world units
-    float imagePlaneWidth = camParams.cameraFovDistance * (dims.x / dims.y);
-    float imagePlaneHeight = camParams.cameraFovDistance;
+    float imagePlaneWidth = camParams.cameraFovDistance;
+    float imagePlaneHeight = camParams.cameraFovDistance * (dims.y / dims.x);
 
     // Compute the offsets in world space
     float3 offset = ndc.x * imagePlaneWidth * viewParams.cam_du.xyz +

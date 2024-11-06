@@ -104,7 +104,7 @@ void run_app(const std::vector<std::string> &args,
     glm::vec3 eye = camDefault[0];
     glm::vec3 camView = camDefault[1];
     glm::vec3 up = camDefault[2];
-    float fov_y = 90.f;
+    float fov_y = fovDefaultDeg;  // 120
     uint32_t samples_per_pixel = 1;
     size_t camera_id = 0;
     size_t benchmark_frames = 0;
@@ -194,6 +194,7 @@ void run_app(const std::vector<std::string> &args,
                                      scene.cameras[camera_id].position);
             up = scene.cameras[camera_id].up;
             fov_y = scene.cameras[camera_id].fov_y;
+            scene.camParams.cameraFOVAngle = fov_y * M_PI / 180.f;
         }
     //}
 
@@ -202,8 +203,10 @@ void run_app(const std::vector<std::string> &args,
     const std::string rt_backend = renderer->name();
     const std::string cpu_brand = get_cpu_brand();
     const std::string gpu_brand = display->gpu_brand();
-    const std::string image_output = "screenshot.png";
+    std::string image_output = "screenshot.png";
+    const std::string image_dir = "screenshots/";
     const std::string display_frontend = display->name();
+    char textBuf[256];  // to hold input text
 
     size_t frame_id = 0;
     float render_time = 0.f;
@@ -215,7 +218,7 @@ void run_app(const std::vector<std::string> &args,
     while (!done) {
         SDL_Event event;
         done = process_SDL_Event(
-            event, io, camera, scene, window, renderer, display, camera_changed, prev_mouse, fov_y);
+            event, io, camera, scene, window, renderer, display, camera_changed, prev_mouse);
 
         if (camera_changed) {
             frame_id = 0;
@@ -227,7 +230,7 @@ void run_app(const std::vector<std::string> &args,
             benchmark_done = true;
         }
 
-        const bool need_readback = save_image || !validation_img_prefix.empty();
+        const bool need_readback = save_image || !validation_img_prefix.empty() || frame_id == max_frames - 1;
         RenderStats stats = frame_id < max_frames ? renderer->render(camera.get_position(),
                                                                      camera.get_direction(),
                                                                      camera.get_up(),
@@ -242,8 +245,8 @@ void run_app(const std::vector<std::string> &args,
 
         if (save_image) {
             save_image = false;
-            std::cout << "Image saved to " << image_output << "\n";
-            stbi_write_png(image_output.c_str(),
+            std::cout << "Image saved to " << image_dir + image_output << "\n";
+            stbi_write_png((image_dir + image_output).c_str(),
                            win_width,
                            win_height,
                            4,
@@ -253,7 +256,7 @@ void run_app(const std::vector<std::string> &args,
         if (!validation_img_prefix.empty()) {
             const std::string img_name = validation_img_prefix + render_plugin->get_name() +
                                          "-f" + std::to_string(frame_id) + ".png";
-            stbi_write_png(img_name.c_str(),
+            stbi_write_png((image_dir + img_name).c_str(),
                            win_width,
                            win_height,
                            4,
@@ -306,6 +309,13 @@ void run_app(const std::vector<std::string> &args,
         ImGui::Text("Display Frontend: %s", display_frontend.c_str());
         ImGui::Text("%s", scene_info.c_str());
 
+        // Let user pick image name
+        std::strncpy(textBuf, image_output.c_str(), sizeof(textBuf));
+        textBuf[sizeof(textBuf) - 1] = '\0';
+        if (ImGui::InputText("Image name ending with '.png' ", textBuf, sizeof(textBuf))) {
+            image_output = textBuf;
+        }
+
         if (ImGui::Button("Save Image")) {
             save_image = true;
         }
@@ -313,6 +323,7 @@ void run_app(const std::vector<std::string> &args,
         if (camParamsDropdown(scene.camParams))
         {
             renderer->update_scene(scene);
+            fov_y = scene.camParams.cameraFOVAngle * 180.f / M_PI;
             camera_changed = true;
         }
             

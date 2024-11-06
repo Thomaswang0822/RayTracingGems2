@@ -20,8 +20,8 @@
 
 /// First some constants
 
-static int win_width = 1280;
-static int win_height = 720;
+static int win_width = 1920;
+static int win_height = 1080;
 
 
 /// Then some short functions
@@ -53,7 +53,6 @@ bool process_SDL_Event(SDL_Event &event,
                        std::unique_ptr<RenderBackend> &renderer,
                        Display *display,
                        bool &camera_changed,
-                       glm::vec2 &prev_mouse,
-                       const float fov_y);
+                       glm::vec2 &prev_mouse);
 
 bool camParamsDropdown(CameraParams &camParams);

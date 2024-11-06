@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 
 static const glm::mat3 camDefault = {
-    glm::vec3(0, 5, 2.3f),    // eye, pos
+    glm::vec3(0, 5, 0),    // eye, pos
     glm::vec3(0, 0, -1),  // view dir
     glm::vec3(0, 1, 0)      // up
 };

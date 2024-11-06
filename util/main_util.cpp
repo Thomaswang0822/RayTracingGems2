@@ -16,8 +16,7 @@ bool process_SDL_Event(SDL_Event &event,
                        std::unique_ptr<RenderBackend> &renderer,
                        Display* display,
                        bool &camera_changed,
-                       glm::vec2 &prev_mouse,
-                       const float fov_y
+                       glm::vec2 &prev_mouse
 )
 {
     bool done = false;
@@ -35,7 +34,7 @@ bool process_SDL_Event(SDL_Event &event,
                 auto up = camera.get_up();
                 std::cout << "-eye " << eye.x << " " << eye.y << " " << eye.z << " -center "
                           << center.x << " " << center.y << " " << center.z << " -up " << up.x
-                          << " " << up.y << " " << up.z << " -fov " << fov_y << "\n";
+                          << " " << up.y << " " << up.z << "\n";
             } else if (event.key.keysym.sym == SDLK_r) {
                 camera.reset();
                 camera_changed = true;
