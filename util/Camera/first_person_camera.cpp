@@ -13,11 +13,11 @@ FirstPersonCamera::FirstPersonCamera(const glm::vec3 &position,
 }
 
 void FirstPersonCamera::reset(glm::vec3 eye,
-                              glm::vec3 center,
+                              glm::vec3 camView,
                               glm::vec3 up)
 {
     this->position = eye;
-    this->direction = glm::normalize(center);
+    this->direction = glm::normalize(camView);
     this->up = glm::normalize(up);
     this->speed = 0.1f;
 }

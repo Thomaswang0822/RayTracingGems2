@@ -3,6 +3,12 @@
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 
+static const glm::mat3 camDefault = {
+    glm::vec3(0, 5, 2.3f),    // eye, pos
+    glm::vec3(0, 0, -1),  // view dir
+    glm::vec3(0, 1, 0)      // up
+};
+
 /* A first-person camera that moves based on WASD/arrow keys for position and
  * mouse dragging for orientation.
  */
@@ -18,9 +24,9 @@ public:
                       const glm::vec3 &direction,
                       const glm::vec3 &up);
 
-    void reset(glm::vec3 eye = {0, 3, 5},
-               glm::vec3 center = {0, 0, -1},
-               glm::vec3 up = {0, 1, 0});
+    void reset(glm::vec3 eye = camDefault[0],
+               glm::vec3 camView = camDefault[1],
+               glm::vec3 up = camDefault[2]);
 
     // Rotate the camera based on mouse delta
     void rotate(glm::vec2 prev_mouse, glm::vec2 cur_mouse);

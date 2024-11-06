@@ -31,6 +31,11 @@ static glm::vec2 transform_mouse(glm::vec2 in)
     return glm::vec2(in.x * 2.f / win_width - 1.f, 1.f - 2.f * in.y / win_height);
 }
 
+static void DisplayVec3(const char *label, const glm::vec3 vec)
+{
+    ImGui::Text("%s: (%.3f, %.3f, %.3f)", label, vec.x, vec.y, vec.z);
+}
+
 
 /// Last, signatures of long funtions
 
@@ -43,9 +48,12 @@ void resetControlCamera(FirstPersonCamera &camera,
 bool process_SDL_Event(SDL_Event &event,
                        ImGuiIO &io,
                        FirstPersonCamera &camera,
+                       Scene &scene,
                        SDL_Window *window,
                        std::unique_ptr<RenderBackend> &renderer,
                        Display *display,
                        bool &camera_changed,
                        glm::vec2 &prev_mouse,
                        const float fov_y);
+
+bool camParamsDropdown(CameraParams &camParams);

@@ -20,7 +20,7 @@ enum CameraType : uint32_t
 /// Implement RTG2 chapter 3, with some default value
 struct CameraParams {
     // Edge-to-edge field of view , in radians
-    float cameraFOVAngle = glm::half_pi<float>();
+    float cameraFOVAngle = glm::half_pi<float>() * 1.333f;
 
     // 0 = cameraFOV is the horizontal FOV
     // 1 = vertical
@@ -36,10 +36,10 @@ struct CameraParams {
 
     // 0-1 value to force straightening of horizontal lines
     // (0 = no straightening , 1 = full straightening)
-    float paniniVerticalCompression = 0.f;
+    float paniniVerticalCompression = 1.f;
 
     // Scalar field of view in m, used for orthographic projection
-    float cameraFovDistance = 1.0f;
+    float cameraFovDistance = 5.0f;
 
     // Lens focal length in meters ,
     // would be measured in millimeters for a physical camera
@@ -52,7 +52,7 @@ struct CameraParams {
     // want focus distance ~= 5.f
     float imagePlaneDistance = 0.0505f;
 
-    CameraType type = CameraType::ThinLens;
+    CameraType type = CameraType::Pinhole;
 
     // to ensure multiple of 4 bytes
     float padding = 0.f;
