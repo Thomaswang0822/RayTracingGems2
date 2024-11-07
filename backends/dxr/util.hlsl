@@ -56,5 +56,31 @@ float pow2(float x) {
 	return x * x;
 }
 
+// draw sample on a unit disk uniformly
+float2 concentric_sample_disk(float u1, float u2)
+{
+    float r, theta;
+    float sx = 2 * u1 - 1;
+    float sy = 2 * u2 - 1;
+
+    if (sx == 0.0 && sy == 0.0)
+    {
+        return float2(0.0, 0.0);
+    }
+
+    if (abs(sx) > abs(sy))
+    {
+        r = sx;
+        theta = (M_PI / 4) * (sy / sx);
+    }
+    else
+    {
+        r = sy;
+        theta = (M_PI / 2) - (M_PI / 4) * (sx / sy);
+    }
+
+    return r * float2(cos(theta), sin(theta));
+}
+
 #endif
 

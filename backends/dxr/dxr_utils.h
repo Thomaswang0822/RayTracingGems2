@@ -12,7 +12,7 @@ class RootSignatureBuilder;
 class DescriptorHeapBuilder;
 
 struct RootParam {
-    D3D12_ROOT_PARAMETER param = {0};
+    D3D12_ROOT_PARAMETER param = {};
     std::string name;
     size_t offset = 0;
     size_t size = 0;
@@ -22,7 +22,7 @@ struct RootParam {
 };
 
 class DescriptorHeap : RootParam {
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {0};
+    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap = nullptr;
 
@@ -303,7 +303,7 @@ private:
 
 struct Geometry {
     Buffer vertex_buf, index_buf, normal_buf, uv_buf;
-    D3D12_RAYTRACING_GEOMETRY_DESC desc = {0};
+    D3D12_RAYTRACING_GEOMETRY_DESC desc = {};
 
     // TODO: Allow other vertex and index formats? Right now this
     // assumes vec3f verts and uint3 indices

@@ -2,6 +2,7 @@
 #include "lcg_rng.hlsl"
 #include "disney_bsdf.hlsl"
 #include "lights.hlsl"
+#include "camera.hlsl"
 #include "util/texture_channel_mask.h"
 
 struct MaterialParams {
@@ -33,17 +34,18 @@ RWTexture2D<float4> accum_buffer : register(u1);
 RWTexture2D<uint> ray_stats : register(u2);
 #endif
 
-// View params buffer
-cbuffer ViewParams : register(b0) {
-    float4 cam_pos;
-    float4 cam_du;
-    float4 cam_dv;
-    float4 cam_dir_top_left;
-    uint32_t frame_id;
-    uint32_t samples_per_pixel;
+/// See camera.hlsl
+cbuffer ViewParamsBuf : register(b0) {
+    ViewParams viewParams;
 }
 
-cbuffer SceneParams : register(b1) {
+/// See camera.hlsl
+cbuffer CameraParamsBuf : register(b1)
+{
+    CameraParams camParams;
+}
+
+cbuffer SceneParams : register(b2) {
     uint32_t num_lights;
 };
 
@@ -167,6 +169,46 @@ float3 sample_direct_light(in const DisneyMaterial mat, in const float3 hit_p, i
     return illum;
 }
 
+RayDesc genCameraRay(const in uint2 pixel, const in float2 dims, inout LCGRand rng)
+{
+    float3 origin, dir;
+    
+    switch (camParams.camType)  // see util/Camera/camera.h
+    {
+        case 0u:
+            computePinholeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 1u:
+            computeThinLensRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 2u:
+            computePaniniRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 3u:
+            computeFishEyeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 4u:
+            computeOrthographicRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        default:
+            computePinholeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+    }
+    
+    RayDesc ray = { origin, 0.f, dir, 1e20f };
+    
+    // hack: sometimes (like in FishEye), we generate invalid rays
+    ray.TMax = length(dir) > 0.9f ? 1e20f : -1.f;
+    
+    return ray;
+
+}
+
 [shader("raygeneration")] 
 void RayGen() {
     const uint2 pixel = DispatchRaysIndex().xy;
@@ -174,15 +216,10 @@ void RayGen() {
 
     uint ray_count = 0;
     float3 illum = float3(0, 0, 0);
-    for (int s = 0; s < samples_per_pixel; ++s) {
-        LCGRand rng = get_rng(frame_id * samples_per_pixel + s);
-        const float2 d = (pixel + float2(lcg_randomf(rng), lcg_randomf(rng))) / dims;
+    for (int s = 0; s < viewParams.samples_per_pixel; ++s) {
+        LCGRand rng = get_rng(viewParams.frame_id * viewParams.samples_per_pixel + s);
 
-        RayDesc ray;
-        ray.Origin = cam_pos.xyz;
-        ray.Direction = normalize(d.x * cam_du.xyz + d.y * cam_dv.xyz + cam_dir_top_left.xyz);
-        ray.TMin = 0;
-        ray.TMax = 1e20f;
+        RayDesc ray = genCameraRay(pixel, dims, rng);
 
         DisneyMaterial mat;
         int bounce = 0;
@@ -240,9 +277,9 @@ void RayGen() {
             }
         } while (bounce < MAX_PATH_DEPTH);
     }
-    illum = illum / samples_per_pixel;
+    illum = illum / viewParams.samples_per_pixel;
 
-    const float4 accum_color = (float4(illum, 1.0) + frame_id * accum_buffer[pixel]) / (frame_id + 1);
+    const float4 accum_color = (float4(illum, 1.0) + viewParams.frame_id * accum_buffer[pixel]) / (viewParams.frame_id + 1);
     accum_buffer[pixel] = accum_color;
 
     output[pixel] = float4(linear_to_srgb(accum_color.r),

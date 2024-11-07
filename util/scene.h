@@ -28,6 +28,7 @@ struct Scene {
     std::vector<Image> textures;
     std::vector<QuadLight> lights;
     std::vector<Camera> cameras;
+    CameraParams camParams;
     uint32_t samples_per_pixel = 1;
     MaterialMode material_mode = MaterialMode::DEFAULT;
 

@@ -4,6 +4,7 @@
 #include "lcg_rng.glsl"
 #include "lights.glsl"
 #include "disney_bsdf.glsl"
+#include "camera.glsl"
 #include "util/texture_channel_mask.h"
 
 struct MaterialParams {
@@ -29,25 +30,24 @@ layout(binding = 0, set = 0) uniform accelerationStructureEXT scene;
 layout(binding = 1, set = 0, rgba8) uniform writeonly image2D framebuffer;
 layout(binding = 2, set = 0, rgba32f) uniform image2D accum_buffer;
 
-layout(binding = 3, set = 0, std140) uniform ViewParams {
-    vec4 cam_pos;
-    vec4 cam_du;
-    vec4 cam_dv;
-    vec4 cam_dir_top_left;
-    int frame_id;
-    int samples_per_pixel;
+layout(binding = 3, set = 0, std140) uniform ViewParamsBuffer {
+    ViewParams viewParams;
 };
 
-layout(binding = 4, set = 0, scalar) buffer MaterialParamsBuffer {
+layout(binding = 4, set = 0, std140) uniform CameraParamsBuffer {
+    CameraParams camParams;
+};
+
+layout(binding = 5, set = 0, scalar) buffer MaterialParamsBuffer {
     MaterialParams material_params[];
 };
 
-layout(binding = 5, set = 0, std430) buffer LightParamsBuffer {
+layout(binding = 6, set = 0, std430) buffer LightParamsBuffer {
     QuadLight lights[];
 };
 
 #ifdef REPORT_RAY_STATS
-layout(binding = 6, set = 0, r16ui) uniform writeonly uimage2D ray_stats;
+layout(binding = 7, set = 0, r16ui) uniform writeonly uimage2D ray_stats;
 #endif
 
 layout(binding = 0, set = 1) uniform sampler2D textures[];
@@ -160,20 +160,55 @@ vec3 sample_direct_light(in const DisneyMaterial mat, in const vec3 hit_p, in co
 	return illum;
 }
 
+
+bool genCameraRay(const in ivec2 pixel, const in vec2 dims, inout LCGRand rng,
+                  out vec3 origin, out vec3 dir)
+{
+    switch (camParams.camType)  // see util/Camera/camera.h
+    {
+        case 0u:
+            computePinholeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 1u:
+            computeThinLensRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 2u:
+            computePaniniRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 3u:
+            computeFishEyeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        case 4u:
+            computeOrthographicRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+        
+        default:
+            computePinholeRay(pixel, dims, rng, viewParams, camParams, origin, dir);
+            break;
+    }
+    
+    // hack: sometimes (like in FishEye), we generate invalid rays, marked by 0 dir
+    return length(dir) > 0.9f;
+}
+
 void main() {
     const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
     const vec2 dims = vec2(gl_LaunchSizeEXT.xy);
 
     uint ray_count = 0;
     vec3 illum = vec3(0.f);
-    for (int s = 0; s < samples_per_pixel; ++s) {
-        LCGRand rng = get_rng(frame_id * samples_per_pixel + s);
+    for (int s = 0; s < viewParams.samples_per_pixel; ++s) {
+        LCGRand rng = get_rng(viewParams.frame_id * viewParams.samples_per_pixel + s);
         vec2 d = (pixel + vec2(lcg_randomf(rng), lcg_randomf(rng))) / dims;
-
-        vec3 ray_origin = cam_pos.xyz;
-        vec3 ray_dir = normalize(d.x * cam_du.xyz + d.y * cam_dv.xyz + cam_dir_top_left.xyz);
+        
+        vec3 ray_origin, ray_dir;
+        bool validRay = genCameraRay(pixel, dims, rng, ray_origin, ray_dir);
         float t_min = 0;
-        float t_max = 1e20f;
+        float t_max = validRay? 1e20f : 0.f;
 
         int bounce = 0;
         vec3 path_throughput = vec3(1.f);
@@ -231,10 +266,10 @@ void main() {
             }
         } while (bounce < MAX_PATH_DEPTH);
     }
-    illum = illum / samples_per_pixel;
+    illum = illum / viewParams.samples_per_pixel;
 
     vec4 accum_color = imageLoad(accum_buffer, pixel);
-    accum_color = (vec4(illum, 1.0) + frame_id * accum_color) / (frame_id + 1);
+    accum_color = (vec4(illum, 1.0) + viewParams.frame_id * accum_color) / (viewParams.frame_id + 1);
     imageStore(accum_buffer, pixel, accum_color);
 
     accum_color.xyz = vec3(linear_to_srgb(accum_color.x), linear_to_srgb(accum_color.y),

@@ -1,7 +1,8 @@
 add_subdirectory(display)
 
 add_library(util
-    arcball_camera.cpp
+    "Camera/arcball_camera.cpp"
+    "Camera/first_person_camera.cpp"
     util.cpp
     material.cpp
     mesh.cpp
@@ -10,7 +11,7 @@ add_library(util
     gltf_types.cpp
     flatten_gltf.cpp
     file_mapping.cpp
-    render_plugin.cpp)
+    render_plugin.cpp "main_util.h" "main_util.cpp")
 
 set_target_properties(util PROPERTIES
     CXX_STANDARD 14
@@ -19,7 +20,8 @@ set_target_properties(util PROPERTIES
 
 target_include_directories(util PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/parallel_hashmap>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/parallel_hashmap>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/Camera>)
 
 target_link_libraries(util PUBLIC imgui glm)
 
