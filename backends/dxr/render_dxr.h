@@ -17,7 +17,7 @@ struct RenderDXR : RenderBackend {
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> render_cmd_allocator;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> render_cmd_list, readback_cmd_list;
 
-    dxr::Buffer view_param_buf, img_readback_buf, instance_buf, material_param_buf, light_buf,
+    dxr::Buffer view_param_buf, camera_param_buf, img_readback_buf, instance_buf, material_param_buf, light_buf,
         ray_stats_readback_buf;
 
     dxr::Texture2D render_target, accum_buffer, ray_stats;
@@ -58,6 +58,8 @@ struct RenderDXR : RenderBackend {
 
     void set_scene(const Scene &scene) override;
 
+    void update_scene(const Scene &scene) override;
+
     RenderStats render(const glm::vec3 &pos,
                        const glm::vec3 &dir,
                        const glm::vec3 &up,
@@ -78,6 +80,8 @@ private:
                                 const glm::vec3 &dir,
                                 const glm::vec3 &up,
                                 const float fovy);
+
+    void update_camera_parameters(const CameraParams &camParams);
 
     void build_descriptor_heap();
 

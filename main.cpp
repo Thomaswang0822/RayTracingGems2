@@ -1,27 +1,11 @@
-#include <algorithm>
-#include <array>
-#include <iostream>
-#include <memory>
-#include <numeric>
-#include <sstream>
-#include <vector>
-#include <SDL.h>
-#include "arcball_camera.h"
-#include "imgui.h"
-#include "scene.h"
-#include "stb_image_write.h"
-#include "util.h"
-#include "util/display/display.h"
-#include "util/display/gldisplay.h"
-#include "util/display/imgui_impl_sdl.h"
-#include "util/render_plugin.h"
+#include "main_util.h"
 
 const std::string USAGE =
     "Usage: <backend> <mesh.obj/gltf/glb> [options]\n"
     "Render backend libraries should be named following (lib)crt_<backend>.(dll|so)\n"
     "Options:\n"
     "\t-eye <x> <y> <z>       Set the camera position\n"
-    "\t-center <x> <y> <z>    Set the camera focus point\n"
+    "\t-camView <x> <y> <z>    Set the camera focus point\n"
     "\t-up <x> <y> <z>        Set the camera up vector\n"
     "\t-fov <fovy>            Specify the camera field of view (in degrees)\n"
     "\t-spp <n>               Specify the number of samples to take per-pixel. Defaults to 1\n"
@@ -32,18 +16,15 @@ const std::string USAGE =
     "white_diffuse\n"
     "\n";
 
-int win_width = 1280;
-int win_height = 720;
+const size_t max_frames = 1024;
 
 void run_app(const std::vector<std::string> &args,
              SDL_Window *window,
              Display *display,
              RenderPlugin *render_plugin);
 
-glm::vec2 transform_mouse(glm::vec2 in)
-{
-    return glm::vec2(in.x * 2.f / win_width - 1.f, 1.f - 2.f * in.y / win_height);
-}
+// Helper function to display an ImGui dropdown for CameraType
+
 
 int main(int argc, const char **argv)
 {
@@ -84,7 +65,7 @@ int main(int argc, const char **argv)
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     }
 
-    SDL_Window *window = SDL_CreateWindow("ChameleonRT",
+    SDL_Window *window = SDL_CreateWindow("gemsRT",
                                           SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED,
                                           win_width,
@@ -119,10 +100,11 @@ void run_app(const std::vector<std::string> &args,
 
     std::string scene_file;
     bool got_camera_args = false;
-    glm::vec3 eye(0, 0, 5);
-    glm::vec3 center(0);
-    glm::vec3 up(0, 1, 0);
-    float fov_y = 65.f;
+    // camDefault defined in first_person_camera.h
+    glm::vec3 eye = camDefault[0];
+    glm::vec3 camView = camDefault[1];
+    glm::vec3 up = camDefault[2];
+    float fov_y = fovDefaultDeg;  // 120
     uint32_t samples_per_pixel = 1;
     size_t camera_id = 0;
     size_t benchmark_frames = 0;
@@ -134,10 +116,10 @@ void run_app(const std::vector<std::string> &args,
             eye.y = std::stof(args[++i]);
             eye.z = std::stof(args[++i]);
             got_camera_args = true;
-        } else if (args[i] == "-center") {
-            center.x = std::stof(args[++i]);
-            center.y = std::stof(args[++i]);
-            center.z = std::stof(args[++i]);
+        } else if (args[i] == "-camView") {
+            camView.x = std::stof(args[++i]);
+            camView.y = std::stof(args[++i]);
+            camView.z = std::stof(args[++i]);
             got_camera_args = true;
         } else if (args[i] == "-up") {
             up.x = std::stof(args[++i]);
@@ -182,7 +164,7 @@ void run_app(const std::vector<std::string> &args,
     renderer->initialize(win_width, win_height);
 
     std::string scene_info;
-    {
+    //{
         Scene scene(scene_file, material_mode);
         scene.samples_per_pixel = samples_per_pixel;
 
@@ -198,6 +180,7 @@ void run_app(const std::vector<std::string> &args,
            << "# Textures: " << scene.textures.size() << "\n"
            << "# Lights: " << scene.lights.size() << "\n"
            << "# Cameras: " << scene.cameras.size() << "\n"
+           << "# Camera Type: " << scene.camParams.type << "\n"
            << "# Samples per Pixel: " << scene.samples_per_pixel;
 
         scene_info = ss.str();
@@ -205,21 +188,25 @@ void run_app(const std::vector<std::string> &args,
 
         renderer->set_scene(scene);
 
-        if (!got_camera_args && !scene.cameras.empty()) {
+        if (!got_camera_args && !scene.cameras.empty() && camera_id <= scene.cameras.size()) {
             eye = scene.cameras[camera_id].position;
-            center = scene.cameras[camera_id].center;
+            camView = glm::normalize(scene.cameras[camera_id].center -
+                                     scene.cameras[camera_id].position);
             up = scene.cameras[camera_id].up;
             fov_y = scene.cameras[camera_id].fov_y;
+            scene.camParams.cameraFOVAngle = fov_y * M_PI / 180.f;
         }
-    }
+    //}
 
-    ArcballCamera camera(eye, center, up);
+    FirstPersonCamera camera(eye, camView, up);
 
     const std::string rt_backend = renderer->name();
     const std::string cpu_brand = get_cpu_brand();
     const std::string gpu_brand = display->gpu_brand();
-    const std::string image_output = "chameleonrt.png";
+    std::string image_output = "screenshot.png";
+    const std::string image_dir = "screenshots/";
     const std::string display_frontend = display->name();
+    char textBuf[256];  // to hold input text
 
     size_t frame_id = 0;
     float render_time = 0.f;
@@ -230,61 +217,8 @@ void run_app(const std::vector<std::string> &args,
     bool save_image = false;
     while (!done) {
         SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                done = true;
-            }
-            if (!io.WantCaptureKeyboard && event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    done = true;
-                } else if (event.key.keysym.sym == SDLK_p) {
-                    auto eye = camera.eye();
-                    auto center = camera.center();
-                    auto up = camera.up();
-                    std::cout << "-eye " << eye.x << " " << eye.y << " " << eye.z
-                              << " -center " << center.x << " " << center.y << " " << center.z
-                              << " -up " << up.x << " " << up.y << " " << up.z << " -fov "
-                              << fov_y << "\n";
-                } else if (event.key.keysym.sym == SDLK_s) {
-                    save_image = true;
-                }
-            }
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
-                event.window.windowID == SDL_GetWindowID(window)) {
-                done = true;
-            }
-            if (!io.WantCaptureMouse) {
-                if (event.type == SDL_MOUSEMOTION) {
-                    const glm::vec2 cur_mouse =
-                        transform_mouse(glm::vec2(event.motion.x, event.motion.y));
-                    if (prev_mouse != glm::vec2(-2.f)) {
-                        if (event.motion.state & SDL_BUTTON_LMASK) {
-                            camera.rotate(prev_mouse, cur_mouse);
-                            camera_changed = true;
-                        } else if (event.motion.state & SDL_BUTTON_RMASK) {
-                            camera.pan(cur_mouse - prev_mouse);
-                            camera_changed = true;
-                        }
-                    }
-                    prev_mouse = cur_mouse;
-                } else if (event.type == SDL_MOUSEWHEEL) {
-                    camera.zoom(event.wheel.y * 0.1);
-                    camera_changed = true;
-                }
-            }
-            if (event.type == SDL_WINDOWEVENT &&
-                event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                frame_id = 0;
-                win_width = event.window.data1;
-                win_height = event.window.data2;
-                io.DisplaySize.x = win_width;
-                io.DisplaySize.y = win_height;
-
-                display->resize(win_width, win_height);
-                renderer->initialize(win_width, win_height);
-            }
-        }
+        done = process_SDL_Event(
+            event, io, camera, scene, window, renderer, display, camera_changed, prev_mouse);
 
         if (camera_changed) {
             frame_id = 0;
@@ -296,17 +230,23 @@ void run_app(const std::vector<std::string> &args,
             benchmark_done = true;
         }
 
-        const bool need_readback = save_image || !validation_img_prefix.empty();
-        RenderStats stats = renderer->render(
-            camera.eye(), camera.dir(), camera.up(), fov_y, camera_changed, need_readback);
-
-        ++frame_id;
+        const bool need_readback = save_image || !validation_img_prefix.empty() || frame_id == max_frames - 1;
+        RenderStats stats = frame_id < max_frames ? renderer->render(camera.get_position(),
+                                                                     camera.get_direction(),
+                                                                     camera.get_up(),
+                                                                     fov_y,
+                                                                     camera_changed,
+                                                                     need_readback)
+                                                  : RenderStats();
+        
+        if (frame_id < max_frames)
+            frame_id++;
         camera_changed = false;
 
         if (save_image) {
             save_image = false;
-            std::cout << "Image saved to " << image_output << "\n";
-            stbi_write_png(image_output.c_str(),
+            std::cout << "Image saved to " << image_dir + image_output << "\n";
+            stbi_write_png((image_dir + image_output).c_str(),
                            win_width,
                            win_height,
                            4,
@@ -316,7 +256,7 @@ void run_app(const std::vector<std::string> &args,
         if (!validation_img_prefix.empty()) {
             const std::string img_name = validation_img_prefix + render_plugin->get_name() +
                                          "-f" + std::to_string(frame_id) + ".png";
-            stbi_write_png(img_name.c_str(),
+            stbi_write_png((image_dir + img_name).c_str(),
                            win_width,
                            win_height,
                            4,
@@ -369,10 +309,24 @@ void run_app(const std::vector<std::string> &args,
         ImGui::Text("Display Frontend: %s", display_frontend.c_str());
         ImGui::Text("%s", scene_info.c_str());
 
+        // Let user pick image name
+        std::strncpy(textBuf, image_output.c_str(), sizeof(textBuf));
+        textBuf[sizeof(textBuf) - 1] = '\0';
+        if (ImGui::InputText("Image name ending with '.png' ", textBuf, sizeof(textBuf))) {
+            image_output = textBuf;
+        }
+
         if (ImGui::Button("Save Image")) {
             save_image = true;
         }
 
+        if (camParamsDropdown(scene.camParams))
+        {
+            renderer->update_scene(scene);
+            fov_y = scene.camParams.cameraFOVAngle * 180.f / M_PI;
+            camera_changed = true;
+        }
+            
         ImGui::End();
         ImGui::Render();
 

@@ -14,8 +14,8 @@ if (REPORT_RAY_STATS)
 	set(GLSL_COMPILE_DEFNS "REPORT_RAY_STATS=1")
 endif()
 
-add_spirv_embed_library(spv_shaders raygen.rgen miss.rmiss hit.rchit
-    occlusion_miss.rmiss
+add_spirv_embed_library(spv_shaders
+    raygen.rgen miss.rmiss hit.rchit occlusion_miss.rmiss
 	COMPILE_OPTIONS -O
     INCLUDE_DIRECTORIES
         ${PROJECT_SOURCE_DIR}

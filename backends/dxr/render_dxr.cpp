@@ -411,6 +411,14 @@ void RenderDXR::set_scene(const Scene &scene)
     build_shader_binding_table();
     build_descriptor_heap();
     record_command_lists();
+
+    // copy camera params from scene
+    update_camera_parameters(scene.camParams);
+}
+
+void RenderDXR::update_scene(const Scene &scene) 
+{
+    update_camera_parameters(scene.camParams);
 }
 
 RenderStats RenderDXR::render(const glm::vec3 &pos,
@@ -530,7 +538,7 @@ void RenderDXR::create_device_objects()
     fence_evt = CreateEvent(nullptr, false, false, nullptr);
 
     // Create the command queue and command allocator
-    D3D12_COMMAND_QUEUE_DESC queue_desc = {0};
+    D3D12_COMMAND_QUEUE_DESC queue_desc = {};
     queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     CHECK_ERR(device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&cmd_queue)));
@@ -573,8 +581,24 @@ void RenderDXR::create_device_objects()
     // uint32_t samples_per_pixel
     view_param_buf = dxr::Buffer::upload(
         device.Get(),
-        align_to(5 * sizeof(glm::vec4), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT),
+        align_to(6 * sizeof(glm::vec4), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT),
         D3D12_RESOURCE_STATE_GENERIC_READ);
+
+    // Another buffer for camera parameters
+    // float cameraFOVAngle;
+    // int cameraFOVDirection;
+    // float2 imageSize;
+    // float paniniDistance;
+    // float paniniVerticalCompression;
+    // float cameraFovDistance;
+    // float lensFocalLength;
+    // float fStop;
+    // float imagePlaneDistance;
+    size_t camera_params_size = sizeof(CameraParams);
+    size_t aligned_camera_params_size =
+        align_to(camera_params_size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+    camera_param_buf = dxr::Buffer::upload(
+        device.Get(), aligned_camera_params_size, D3D12_RESOURCE_STATE_GENERIC_READ);
 
     // Our query heap will store two timestamps, the time that DispatchRays starts and the time
     // it ends
@@ -600,7 +624,7 @@ void RenderDXR::build_raytracing_pipeline()
     // Create the root signature for our ray gen shader
     dxr::RootSignature raygen_root_sig =
         dxr::RootSignatureBuilder::local()
-            .add_constants("SceneParams", 1, 1, 0)
+            .add_constants("SceneParams", /* shader_register = */ 2, /* num_vals = */ 1, /* space = */ 0)
             .add_desc_heap("cbv_srv_uav_heap", raygen_desc_heap)
             .add_desc_heap("sampler_heap", raygen_sampler_heap)
             .create(device.Get());
@@ -657,7 +681,7 @@ void RenderDXR::build_shader_resource_heap()
                            .add_uav_range(2, 0, 0)
 #endif
                            .add_srv_range(3, 0, 0)
-                           .add_cbv_range(1, 0, 0)
+                           .add_cbv_range(2, 0, 0)
                            .add_srv_range(!textures.empty() ? textures.size() : 1, 3, 0)
                            .create(device.Get());
 
@@ -757,7 +781,7 @@ void RenderDXR::update_view_parameters(const glm::vec3 &pos,
 
     const glm::vec3 dir_du = glm::normalize(glm::cross(dir, up)) * img_plane_size.x;
     const glm::vec3 dir_dv = -glm::normalize(glm::cross(dir_du, dir)) * img_plane_size.y;
-    const glm::vec3 dir_top_left = dir - 0.5f * dir_du - 0.5f * dir_dv;
+    const glm::vec3 dir_top_left = glm::normalize(dir - 0.5f * dir_du - 0.5f * dir_dv);
 
     uint8_t *buf = static_cast<uint8_t *>(view_param_buf.map());
     {
@@ -765,10 +789,11 @@ void RenderDXR::update_view_parameters(const glm::vec3 &pos,
         vecs[0] = glm::vec4(pos, 0.f);
         vecs[1] = glm::vec4(dir_du, 0.f);
         vecs[2] = glm::vec4(dir_dv, 0.f);
-        vecs[3] = glm::vec4(dir_top_left, 0.f);
+        vecs[3] = glm::vec4(dir, 0.f);
+        vecs[4] = glm::vec4(dir_top_left, 0.f);
     }
     {
-        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 4 * sizeof(glm::vec4));
+        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 5 * sizeof(glm::vec4));
         fid[0] = frame_id;
         fid[1] = samples_per_pixel;
     }
@@ -776,11 +801,19 @@ void RenderDXR::update_view_parameters(const glm::vec3 &pos,
     view_param_buf.unmap();
 }
 
+void RenderDXR::update_camera_parameters(const CameraParams &camParams) 
+{
+    // Map the buffer and copy data
+    uint8_t *buf = static_cast<uint8_t *>(camera_param_buf.map());
+    std::memcpy(buf, &camParams, sizeof(CameraParams));
+    camera_param_buf.unmap();
+}
+
 void RenderDXR::build_descriptor_heap()
 {
     D3D12_CPU_DESCRIPTOR_HANDLE heap_handle = raygen_desc_heap.cpu_desc_handle();
 
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {0};
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
 
     // Render target
     uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
@@ -802,7 +835,7 @@ void RenderDXR::build_descriptor_heap()
 
     // Write the TLAS after the output image in the heap
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC tlas_desc = {0};
+        D3D12_SHADER_RESOURCE_VIEW_DESC tlas_desc = {};
         tlas_desc.Format = DXGI_FORMAT_UNKNOWN;
         tlas_desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
         tlas_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -814,7 +847,7 @@ void RenderDXR::build_descriptor_heap()
 
     // Write the material params buffer view
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {0};
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
         srv_desc.Format = DXGI_FORMAT_UNKNOWN;
         srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -829,7 +862,7 @@ void RenderDXR::build_descriptor_heap()
 
     // Write the light params buffer view
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {0};
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
         srv_desc.Format = DXGI_FORMAT_UNKNOWN;
         srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
         srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -842,17 +875,29 @@ void RenderDXR::build_descriptor_heap()
             device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
-    // Write the view params constants buffer
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {0};
-    cbv_desc.BufferLocation = view_param_buf->GetGPUVirtualAddress();
-    cbv_desc.SizeInBytes = view_param_buf.size();
-    device->CreateConstantBufferView(&cbv_desc, heap_handle);
-    heap_handle.ptr +=
-        device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    {
+        // Write the view params constants buffer
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {0};
+        cbv_desc.BufferLocation = view_param_buf->GetGPUVirtualAddress();
+        cbv_desc.SizeInBytes = view_param_buf.size();
+        device->CreateConstantBufferView(&cbv_desc, heap_handle);
+        heap_handle.ptr +=
+            device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    {
+        // Create the CBV for camera_param_buf
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {0};
+        cbv_desc.BufferLocation = camera_param_buf->GetGPUVirtualAddress();
+        cbv_desc.SizeInBytes = camera_param_buf.size();  // Use the aligned size
+        device->CreateConstantBufferView(&cbv_desc, heap_handle);
+        heap_handle.ptr +=  // Move to next slot
+            device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 
     // Write the SRVs for the textures
     for (auto &t : textures) {
-        D3D12_SHADER_RESOURCE_VIEW_DESC tex_desc = {0};
+        D3D12_SHADER_RESOURCE_VIEW_DESC tex_desc = {};
         tex_desc.Format = t.pixel_format();
         tex_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         tex_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -863,7 +908,7 @@ void RenderDXR::build_descriptor_heap()
     }
 
     // Write the sampler to the sampler heap
-    D3D12_SAMPLER_DESC sampler_desc = {0};
+    D3D12_SAMPLER_DESC sampler_desc = {};
     sampler_desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     sampler_desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     sampler_desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;

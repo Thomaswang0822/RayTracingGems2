@@ -15,6 +15,11 @@
 #define OCCLUSION_RAY 1
 #define MAX_PATH_DEPTH 5
 
+#define RED   vec4(1.f, 0.f, 0.f, 1.f)
+#define GREEN vec4(0.f, 1.f, 0.f, 1.f)
+#define BLUE  vec4(0.f, 0.f, 1.f, 1.f)
+
+
 struct RayPayload {
     vec3 normal;
     float dist;
