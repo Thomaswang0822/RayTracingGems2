@@ -203,7 +203,7 @@ RayDesc genCameraRay(const in uint2 pixel, const in float2 dims, inout LCGRand r
     RayDesc ray = { origin, 0.f, dir, 1e20f };
     
     // hack: sometimes (like in FishEye), we generate invalid rays
-    //ray.TMax = length(dir) > 0.9f ? 1e20f : -1.f;
+    ray.TMax = length(dir) > 0.9f ? 1e20f : -1.f;
     
     return ray;
 

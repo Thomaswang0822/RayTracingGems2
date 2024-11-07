@@ -21,7 +21,8 @@ struct HitGroupParams {
 struct RenderVulkan : RenderBackend {
     std::shared_ptr<vkrt::Device> device;
 
-    std::shared_ptr<vkrt::Buffer> view_param_buf, img_readback_buf, mat_params, light_params;
+    std::shared_ptr<vkrt::Buffer> view_param_buf, camera_param_buf, img_readback_buf,
+        mat_params, light_params;
 
     std::shared_ptr<vkrt::Texture2D> render_target, accum_buffer;
 
@@ -98,5 +99,7 @@ private:
                                 const glm::vec3 &up,
                                 const float fovy);
 
+    void update_camera_parameters(const CameraParams &camParams);
+    
     void record_command_buffers();
 };

@@ -43,9 +43,14 @@ RenderVulkan::RenderVulkan(std::shared_ptr<vkrt::Device> dev)
     }
 
     view_param_buf = vkrt::Buffer::host(*device,
-                                        4 * sizeof(glm::vec4) + 2 * sizeof(uint32_t),
+                                        6 * sizeof(glm::vec4),
                                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    camera_param_buf = vkrt::Buffer::host( *device,
+                                            3 * sizeof(glm::vec4),
+                                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     VkQueryPoolCreateInfo pool_ci = {};
     pool_ci.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -666,11 +671,14 @@ void RenderVulkan::set_scene(const Scene &scene)
     build_shader_descriptor_table();
     build_shader_binding_table();
     record_command_buffers();
+
+    // copy camera params from scene
+    update_camera_parameters(scene.camParams);
 }
 
 void RenderVulkan::update_scene(const Scene &scene) 
 {
-    // TODO
+    update_camera_parameters(scene.camParams);
 }
 
 RenderStats RenderVulkan::render(const glm::vec3 &pos,
@@ -768,12 +776,14 @@ void RenderVulkan::build_raytracing_pipeline()
             .add_binding(
                 3, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .add_binding(
-                4, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+                4, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
             .add_binding(
                 5, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+            .add_binding(
+                6, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
 #ifdef REPORT_RAY_STATS
             .add_binding(
-                6, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+                7, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
 #endif
             .build(*device);
 
@@ -875,10 +885,12 @@ void RenderVulkan::build_shader_descriptor_table()
                        .write_storage_image(desc_set, 1, render_target)
                        .write_storage_image(desc_set, 2, accum_buffer)
                        .write_ubo(desc_set, 3, view_param_buf)
-                       .write_ssbo(desc_set, 4, mat_params)
-                       .write_ssbo(desc_set, 5, light_params);
+                       .write_ubo(desc_set, 4, camera_param_buf)
+                       .write_ssbo(desc_set, 5, mat_params)
+                       .write_ssbo(desc_set, 6, light_params);
+                       
 #ifdef REPORT_RAY_STATS
-    updater.write_storage_image(desc_set, 6, ray_stats);
+    updater.write_storage_image(desc_set, 7, ray_stats);
 #endif
 
     if (!combined_samplers.empty()) {
@@ -994,14 +1006,22 @@ void RenderVulkan::update_view_parameters(const glm::vec3 &pos,
         vecs[0] = glm::vec4(pos, 0.f);
         vecs[1] = glm::vec4(dir_du, 0.f);
         vecs[2] = glm::vec4(dir_dv, 0.f);
-        vecs[3] = glm::vec4(dir_top_left, 0.f);
+        vecs[3] = glm::vec4(dir, 0.f);
+        vecs[4] = glm::vec4(dir_top_left, 0.f);
     }
     {
-        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 4 * sizeof(glm::vec4));
+        uint32_t *fid = reinterpret_cast<uint32_t *>(buf + 5 * sizeof(glm::vec4));
         fid[0] = frame_id;
         fid[1] = samples_per_pixel;
     }
     view_param_buf->unmap();
+}
+
+void RenderVulkan::update_camera_parameters(const CameraParams &camParams) {
+    // Map the buffer and copy data
+    uint8_t *buf = static_cast<uint8_t *>(camera_param_buf->map());
+    std::memcpy(buf, &camParams, sizeof(CameraParams));
+    camera_param_buf->unmap();
 }
 
 void RenderVulkan::record_command_buffers()
